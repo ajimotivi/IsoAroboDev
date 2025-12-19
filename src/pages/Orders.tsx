@@ -3,9 +3,8 @@ import { Link } from 'react-router-dom';
 import { Package, ChevronRight, Clock, CheckCircle, Truck, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { orders, Order } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { Order } from '@/types/database';
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-warning', label: 'Pending' },
@@ -17,21 +16,25 @@ const statusConfig: Record<string, { icon: React.ElementType; color: string; lab
 
 const Orders = () => {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersList, setOrdersList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setOrders(data);
-      setLoading(false);
+      try {
+        const response = await orders.list();
+        setOrdersList(response.data.orders || []);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setOrdersList([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchOrders();
@@ -68,7 +71,7 @@ const Orders = () => {
     );
   }
 
-  if (orders.length === 0) {
+  if (ordersList.length === 0) {
     return (
       <Layout>
         <div className="container-main py-16 text-center">
@@ -91,7 +94,7 @@ const Orders = () => {
         <h1 className="section-title mb-8">My Orders</h1>
 
         <div className="space-y-4">
-          {orders.map((order) => {
+          {ordersList.map((order) => {
             const status = statusConfig[order.status] || statusConfig.pending;
             const StatusIcon = status.icon;
 

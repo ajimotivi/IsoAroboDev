@@ -3,8 +3,17 @@ import { useParams, Link } from 'react-router-dom';
 import { CheckCircle, Download, Home, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
-import { Order, OrderItem } from '@/types/database';
+import { orders, Order } from '@/lib/apiClient';
+
+interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  product_price: number;
+  quantity: number;
+  subtotal: number;
+}
 
 const Receipt = () => {
   const { orderId } = useParams();
@@ -16,21 +25,15 @@ const Receipt = () => {
     const fetchOrder = async () => {
       if (!orderId) return;
 
-      const [orderRes, itemsRes] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('*')
-          .eq('id', orderId)
-          .single(),
-        supabase
-          .from('order_items')
-          .select('*')
-          .eq('order_id', orderId),
-      ]);
-
-      if (orderRes.data) setOrder(orderRes.data);
-      if (itemsRes.data) setOrderItems(itemsRes.data);
-      setLoading(false);
+      try {
+        const response = await orders.getById(orderId);
+        setOrder(response.data.order);
+        setOrderItems(response.data.order.items || []);
+      } catch (error) {
+        console.error('Error fetching order:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchOrder();

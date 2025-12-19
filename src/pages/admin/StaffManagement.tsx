@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppRole, ROLE_LABELS, STAFF_ROLES } from '@/types/roles';
 import { toast } from 'sonner';
@@ -42,111 +41,70 @@ const StaffManagement = () => {
   }, []);
 
   const fetchStaff = async () => {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('id, user_id, role, created_at')
-      .in('role', STAFF_ROLES);
-
-    if (roles) {
-      const userIds = roles.map(r => r.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, email, full_name')
-        .in('id', userIds);
-
-      const staffWithProfiles = roles.map(r => {
-        const profile = profiles?.find(p => p.id === r.user_id);
-        return {
-          ...r,
-          role: r.role as AppRole,
-          email: profile?.email || 'Unknown',
-          full_name: profile?.full_name,
-        };
-      });
-
-      setStaff(staffWithProfiles);
+    try {
+      // TODO: Implement staff list endpoint in PHP backend
+      // For now, show empty state
+      setStaff([]);
+      toast.error('Staff management endpoints not yet implemented');
+      
+      // This would be the actual implementation:
+      // const response = await api.staff.list();
+      // setStaff(response.data.staff || []);
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+      toast.error('Failed to fetch staff');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAddStaff = async () => {
-    // First find or create user by email
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', newStaffEmail)
-      .maybeSingle();
-
-    if (!existingProfile) {
-      toast.error('User not found. They must sign up first.');
-      return;
+    try {
+      // TODO: Implement add staff endpoint
+      toast.error('Add staff endpoint not yet implemented');
+      
+      // This would be the actual implementation:
+      // await api.staff.add({ email: newStaffEmail, role: newStaffRole });
+      // toast.success('Staff member added successfully');
+      
+      setDialogOpen(false);
+      setNewStaffEmail('');
+      fetchStaff();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add staff member');
     }
-
-    // Check if they already have a role
-    const { data: existingRole } = await supabase
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', existingProfile.id)
-      .maybeSingle();
-
-    if (existingRole) {
-      // Update existing role
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newStaffRole })
-        .eq('user_id', existingProfile.id);
-
-      if (error) {
-        toast.error('Failed to update role');
-        return;
-      }
-    } else {
-      // Insert new role
-      const { error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: existingProfile.id, role: newStaffRole });
-
-      if (error) {
-        toast.error('Failed to assign role');
-        return;
-      }
-    }
-
-    toast.success('Staff member added successfully');
-    setDialogOpen(false);
-    setNewStaffEmail('');
-    fetchStaff();
   };
 
   const handleUpdateRole = async (userId: string, newRole: AppRole) => {
-    const { error } = await supabase
-      .from('user_roles')
-      .update({ role: newRole })
-      .eq('user_id', userId);
-
-    if (error) {
+    try {
+      // TODO: Implement update role endpoint
+      toast.error('Update role endpoint not yet implemented');
+      
+      // This would be the actual implementation:
+      // await api.staff.updateRole(userId, newRole);
+      // toast.success('Role updated');
+      
+      fetchStaff();
+    } catch (error) {
       toast.error('Failed to update role');
-      return;
     }
-
-    toast.success('Role updated');
-    fetchStaff();
   };
 
   const handleRemoveStaff = async (userId: string) => {
-    // Downgrade to customer instead of deleting
-    const { error } = await supabase
-      .from('user_roles')
-      .update({ role: 'customer' })
-      .eq('user_id', userId);
-
-    if (error) {
+    if (!confirm('Are you sure you want to remove this staff member?')) return;
+    
+    try {
+      // TODO: Implement remove staff endpoint
+      toast.error('Remove staff endpoint not yet implemented');
+      
+      // This would be the actual implementation:
+      // await api.staff.remove(userId);
+      // toast.success('Staff member removed');
+      
+      fetchStaff();
+    } catch (error) {
       toast.error('Failed to remove staff member');
-      return;
     }
-
-    toast.success('Staff member removed');
-    fetchStaff();
   };
 
   if (authLoading || loading) {
@@ -213,57 +171,71 @@ const StaffManagement = () => {
           </Dialog>
         </div>
 
-        <div className="bg-card rounded-xl border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Added</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {staff.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell className="font-medium">{member.full_name || 'N/A'}</TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={member.role}
-                      onValueChange={(v) => handleUpdateRole(member.user_id, v as AppRole)}
-                      disabled={member.user_id === user?.id}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STAFF_ROLES.map(role => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>{new Date(member.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    {member.user_id !== user?.id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveStaff(member.user_id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </TableCell>
+        {staff.length === 0 ? (
+          <div className="bg-card rounded-xl border border-border p-12 text-center">
+            <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No staff members yet</h3>
+            <p className="text-muted-foreground mb-6">
+              Add staff members to help manage your store
+            </p>
+            <p className="text-sm text-yellow-600 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <strong>Note:</strong> Staff management endpoints need to be implemented in the PHP backend.
+              <br />This feature will be available once the backend is complete.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-card rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Added</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {staff.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="font-medium">{member.full_name || 'N/A'}</TableCell>
+                    <TableCell>{member.email}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={member.role}
+                        onValueChange={(v) => handleUpdateRole(member.user_id, v as AppRole)}
+                        disabled={member.user_id === user?.id}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STAFF_ROLES.map(role => (
+                            <SelectItem key={role} value={role}>
+                              {ROLE_LABELS[role]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>{new Date(member.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      {member.user_id !== user?.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveStaff(member.user_id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -6,9 +6,23 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { orders, Order } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { Profile, Order } from '@/types/database';
+import { toast } from 'sonner';
+
+interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  country: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 interface CustomerWithOrders extends Profile {
   order_count: number;
@@ -35,42 +49,65 @@ const CustomerManagement = () => {
   }, []);
 
   const fetchCustomers = async () => {
-    // Get all profiles
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (profiles) {
-      // Get order summaries for each customer
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('user_id, total');
-
-      const customersWithOrders = profiles.map(profile => {
-        const customerOrders = orders?.filter(o => o.user_id === profile.id) || [];
-        return {
-          ...profile,
-          order_count: customerOrders.length,
-          total_spent: customerOrders.reduce((sum, o) => sum + Number(o.total), 0),
-        };
+    try {
+      // TODO: Implement customers list endpoint
+      // For now, we'll extract unique customers from orders
+      const ordersResponse = await orders.list();
+      const allOrders = ordersResponse.data.orders || [];
+      
+      // Group orders by user_id to get customer stats
+      const customerMap = new Map<string, CustomerWithOrders>();
+      
+      allOrders.forEach(order => {
+        const existing = customerMap.get(order.user_id);
+        if (existing) {
+          existing.order_count++;
+          existing.total_spent += order.total;
+        } else {
+          customerMap.set(order.user_id, {
+            id: order.user_id,
+            email: `customer-${order.user_id.slice(0, 8)}@example.com`, // Placeholder
+            full_name: null,
+            phone: null,
+            address: order.shipping_address,
+            city: order.shipping_city,
+            postal_code: order.shipping_postal_code,
+            country: order.shipping_country,
+            avatar_url: null,
+            created_at: order.created_at,
+            updated_at: order.updated_at,
+            order_count: 1,
+            total_spent: order.total,
+          });
+        }
       });
-
-      setCustomers(customersWithOrders);
+      
+      setCustomers(Array.from(customerMap.values()));
+      
+      if (allOrders.length === 0) {
+        toast.info('No customer data available yet');
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      toast.error('Failed to fetch customers');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleViewCustomer = async (customer: CustomerWithOrders) => {
     setSelectedCustomer(customer);
     
-    const { data } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('user_id', customer.id)
-      .order('created_at', { ascending: false });
-
-    setCustomerOrders(data || []);
+    try {
+      const ordersResponse = await orders.list();
+      const customerOrdersList = ordersResponse.data.orders.filter(
+        o => o.user_id === customer.id
+      );
+      setCustomerOrders(customerOrdersList);
+    } catch (error) {
+      console.error('Error fetching customer orders:', error);
+      setCustomerOrders([]);
+    }
   };
 
   const filteredCustomers = customers.filter(c =>
@@ -111,42 +148,51 @@ const CustomerManagement = () => {
           />
         </div>
 
-        <div className="bg-card rounded-xl border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Total Spent</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.full_name || 'N/A'}</TableCell>
-                  <TableCell>{customer.email}</TableCell>
-                  <TableCell>{customer.phone || 'N/A'}</TableCell>
-                  <TableCell>{customer.order_count}</TableCell>
-                  <TableCell>${customer.total_spent.toFixed(2)}</TableCell>
-                  <TableCell>{new Date(customer.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewCustomer(customer)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+        {filteredCustomers.length === 0 ? (
+          <div className="bg-card rounded-xl border border-border p-12 text-center">
+            <p className="text-muted-foreground">No customers found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Customer data is derived from order information
+            </p>
+          </div>
+        ) : (
+          <div className="bg-card rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer ID</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Orders</TableHead>
+                  <TableHead>Total Spent</TableHead>
+                  <TableHead>First Order</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-mono text-xs">{customer.id.slice(0, 8)}...</TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell>{customer.city ? `${customer.city}, ${customer.country}` : 'N/A'}</TableCell>
+                    <TableCell>{customer.order_count}</TableCell>
+                    <TableCell>${customer.total_spent.toFixed(2)}</TableCell>
+                    <TableCell>{new Date(customer.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewCustomer(customer)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         <Dialog open={!!selectedCustomer} onOpenChange={() => setSelectedCustomer(null)}>
           <DialogContent className="max-w-2xl">
@@ -157,8 +203,8 @@ const CustomerManagement = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{selectedCustomer.full_name || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">Customer ID</p>
+                    <p className="font-mono text-sm">{selectedCustomer.id}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground flex items-center gap-1">

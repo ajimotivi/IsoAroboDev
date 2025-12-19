@@ -4,8 +4,7 @@ import { ArrowLeft, Star, ShoppingCart, Minus, Plus, Truck, Shield, RotateCcw } 
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
 import { ProductGrid } from '@/components/products/ProductGrid';
-import { supabase } from '@/integrations/supabase/client';
-import { Product } from '@/types/database';
+import { products, Product } from '@/lib/apiClient';
 import { useCart } from '@/hooks/useCart';
 
 const ProductDetail = () => {
@@ -19,30 +18,32 @@ const ProductDetail = () => {
 
   useEffect(() => {
     const fetchProduct = async () => {
+      if (!slug) return;
+      
       setLoading(true);
-      const { data: productData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('slug', slug)
-        .single();
-
-      if (productData) {
+      try {
+        const response = await products.getBySlug(slug);
+        const productData = response.data.product;
         setProduct(productData);
         
         // Fetch related products from same category
-        const { data: related } = await supabase
-          .from('products')
-          .select('*')
-          .eq('category_id', productData.category_id)
-          .neq('id', productData.id)
-          .limit(4);
-        
-        if (related) setRelatedProducts(related);
+        if (productData.category_slug) {
+          const relatedResponse = await products.list({
+            category: productData.category_slug,
+            limit: 4
+          });
+          
+          // Filter out current product
+          const filtered = relatedResponse.data.products.filter(p => p.id !== productData.id);
+          setRelatedProducts(filtered);
+        }
+      } catch (error) {
+        console.error('Error fetching product:', error);
       }
       setLoading(false);
     };
 
-    if (slug) fetchProduct();
+    fetchProduct();
   }, [slug]);
 
   const handleAddToCart = () => {
@@ -124,8 +125,8 @@ const ProductDetail = () => {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-1">
                   <Star className="h-5 w-5 fill-rating text-rating" />
-                  <span className="font-medium">{product.rating}</span>
-                  <span className="text-muted-foreground">({product.review_count} reviews)</span>
+                  <span className="font-medium">{product.rating || 0}</span>
+                  <span className="text-muted-foreground">({product.review_count || 0} reviews)</span>
                 </div>
               </div>
             </div>

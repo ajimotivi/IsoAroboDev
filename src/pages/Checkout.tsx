@@ -8,7 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Layout } from '@/components/layout/Layout';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { orders } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
 const Checkout = () => {
@@ -31,10 +31,6 @@ const Checkout = () => {
   const shipping = subtotal > 50 ? 0 : 9.99;
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
-
-  const generateOrderNumber = () => {
-    return `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,68 +56,33 @@ const Checkout = () => {
 
     setLoading(true);
 
-    const orderNumber = generateOrderNumber();
-
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        user_id: user.id,
-        order_number: orderNumber,
-        status: 'pending',
-        subtotal: subtotal,
-        tax: tax,
-        shipping: shipping,
-        total: total,
+    try {
+      const response = await orders.create({
         shipping_address: shippingInfo.address,
         shipping_city: shippingInfo.city,
         shipping_postal_code: shippingInfo.postalCode,
         shipping_country: shippingInfo.country,
         payment_method: paymentMethod,
-        payment_status: 'completed',
-      })
-      .select()
-      .single();
+        notes: '',
+      });
 
-    if (orderError) {
+      await clearCart();
+
+      toast({
+        title: "Order placed!",
+        description: `Your order has been confirmed.`,
+      });
+
+      navigate(`/receipt/${response.data.order.id}`);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to create order. Please try again.",
+        description: error.message || "Failed to create order. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Create order items
-    const orderItems = cartItems.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      product_name: item.product.name,
-      product_price: item.product.price,
-      quantity: item.quantity,
-      subtotal: item.product.price * item.quantity,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
-
-    if (itemsError) {
-      console.error('Error creating order items:', itemsError);
-    }
-
-    // Clear cart
-    await clearCart();
-
-    toast({
-      title: "Order placed!",
-      description: `Your order ${orderNumber} has been confirmed.`,
-    });
-
-    // Redirect to receipt page
-    navigate(`/receipt/${order.id}`);
-    setLoading(false);
   };
 
   if (!user) {
@@ -270,16 +231,16 @@ const Checkout = () => {
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex items-center space-x-3">
                       <img
-                        src={item.product.image_url || '/placeholder.svg'}
-                        alt={item.product.name}
+                        src={item.product?.image_url || '/placeholder.svg'}
+                        alt={item.product?.name}
                         className="w-12 h-12 object-cover rounded bg-secondary"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.product.name}</p>
+                        <p className="text-sm font-medium truncate">{item.product?.name}</p>
                         <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                       </div>
                       <span className="text-sm font-medium">
-                        ${(item.product.price * item.quantity).toFixed(2)}
+                        ${((item.product?.price || 0) * item.quantity).toFixed(2)}
                       </span>
                     </div>
                   ))}

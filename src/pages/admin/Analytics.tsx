@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package, Users } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { orders, products as productsApi, Order, Product } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -37,42 +37,33 @@ const Analytics = () => {
   }, []);
 
   const fetchAnalytics = async () => {
-    // Fetch orders
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('total, created_at')
-      .order('created_at', { ascending: true });
+    try {
+      // Fetch orders
+      const ordersResponse = await orders.list();
+      const ordersList = ordersResponse.data.orders || [];
 
-    // Fetch products count
-    const { count: productCount } = await supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true });
+      // Fetch products count
+      const productsResponse = await productsApi.list();
+      const productsList = productsResponse.data.products || [];
 
-    // Fetch customers count (profiles)
-    const { count: customerCount } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true });
-
-    // Fetch order items for top products
-    const { data: orderItems } = await supabase
-      .from('order_items')
-      .select('product_name, quantity');
-
-    if (orders) {
-      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total), 0);
-      const totalOrders = orders.length;
+      // Calculate stats
+      const totalRevenue = ordersList.reduce((sum, o) => sum + Number(o.total), 0);
+      const totalOrders = ordersList.length;
+      
+      // Get unique customers from orders
+      const uniqueCustomers = new Set(ordersList.map(o => o.user_id)).size;
       
       setStats({
         totalRevenue,
         totalOrders,
-        totalProducts: productCount || 0,
-        totalCustomers: customerCount || 0,
+        totalProducts: productsList.length,
+        totalCustomers: uniqueCustomers,
         avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       });
 
-      // Group by date for chart
+      // Group orders by date for chart
       const revenueByDate: Record<string, { revenue: number; orders: number }> = {};
-      orders.forEach(order => {
+      ordersList.forEach(order => {
         const date = new Date(order.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         if (!revenueByDate[date]) {
           revenueByDate[date] = { revenue: 0, orders: 0 };
@@ -81,29 +72,31 @@ const Analytics = () => {
         revenueByDate[date].orders += 1;
       });
 
-      setDailyData(Object.entries(revenueByDate).map(([date, data]) => ({
+      const dailyDataArray = Object.entries(revenueByDate).map(([date, data]) => ({
         date,
         revenue: data.revenue,
         orders: data.orders,
-      })));
+      }));
+
+      setDailyData(dailyDataArray);
+
+      // Top products would need order_items data
+      // For now, we'll show top products by stock or featured
+      const topProductsByStock = productsList
+        .sort((a, b) => (b.review_count || 0) - (a.review_count || 0))
+        .slice(0, 5)
+        .map(p => ({
+          name: p.name.length > 20 ? p.name.slice(0, 20) + '...' : p.name,
+          quantity: p.review_count || 0
+        }));
+
+      setTopProducts(topProductsByStock);
+
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setLoading(false);
     }
-
-    if (orderItems) {
-      // Aggregate by product
-      const productQuantities: Record<string, number> = {};
-      orderItems.forEach(item => {
-        productQuantities[item.product_name] = (productQuantities[item.product_name] || 0) + item.quantity;
-      });
-
-      const sorted = Object.entries(productQuantities)
-        .map(([name, quantity]) => ({ name, quantity }))
-        .sort((a, b) => b.quantity - a.quantity)
-        .slice(0, 5);
-
-      setTopProducts(sorted);
-    }
-
-    setLoading(false);
   };
 
   if (authLoading || loading) {
@@ -162,55 +155,67 @@ const Analytics = () => {
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="font-semibold mb-4">Revenue Over Time</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="hsl(var(--primary))" 
-                    fill="hsl(var(--primary) / 0.2)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {dailyData.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dailyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="date" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="hsl(var(--primary))" 
+                      fill="hsl(var(--primary) / 0.2)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-muted-foreground">
+                No revenue data available yet
+              </div>
+            )}
           </div>
 
           <div className="bg-card rounded-xl border border-border p-6">
-            <h2 className="font-semibold mb-4">Top Products</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topProducts} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    width={100} 
-                    className="text-xs"
-                    tick={{ fontSize: 11 }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Bar dataKey="quantity" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <h2 className="font-semibold mb-4">Top Products (By Reviews)</h2>
+            {topProducts.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topProducts} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" className="text-xs" />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      width={100} 
+                      className="text-xs"
+                      tick={{ fontSize: 11 }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Bar dataKey="quantity" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-muted-foreground">
+                No product data available yet
+              </div>
+            )}
           </div>
         </div>
       </div>

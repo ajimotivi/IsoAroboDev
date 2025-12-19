@@ -6,16 +6,15 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { orders, products as productsApi, Order, Product } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { Order, Product } from '@/types/database';
 import { ROLE_LABELS, ROLE_PERMISSIONS } from '@/types/roles';
 
 const Admin = () => {
   const { user, userRole, isStaff, hasPermission, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [ordersList, setOrdersList] = useState<Order[]>([]);
+  const [productsList, setProductsList] = useState<Product[]>([]);
   const [customerCount, setCustomerCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -29,32 +28,27 @@ const Admin = () => {
     const fetchData = async () => {
       if (!isStaff) return;
 
-      // Fetch orders if permitted
-      if (hasPermission('view_all_orders')) {
-        const { data } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        if (data) setOrders(data);
-      }
+      try {
+        // Fetch orders if permitted
+        if (hasPermission('view_all_orders')) {
+          const ordersResponse = await orders.list();
+          setOrdersList(ordersResponse.data.orders || []);
+        }
 
-      // Fetch products if permitted
-      if (hasPermission('manage_products')) {
-        const { data } = await supabase.from('products').select('*');
-        if (data) setProducts(data);
-      }
+        // Fetch products if permitted
+        if (hasPermission('manage_products')) {
+          const productsResponse = await productsApi.list();
+          setProductsList(productsResponse.data.products || []);
+        }
 
-      // Fetch customer count if permitted
-      if (hasPermission('view_customers')) {
-        const { count } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
-        if (count !== null) setCustomerCount(count);
+        // Note: Customer count would need a new endpoint
+        // For now we'll skip it or estimate from orders
+        setCustomerCount(0);
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      } finally {
+        setLoading(false);
       }
-
-      
-      setLoading(false);
     };
 
     if (isStaff) fetchData();
@@ -77,7 +71,7 @@ const Admin = () => {
 
   if (!isStaff) return null;
 
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total), 0);
+  const totalRevenue = ordersList.reduce((sum, o) => sum + Number(o.total), 0);
 
   // Navigation items based on permissions
   const navItems = [
@@ -157,12 +151,12 @@ const Admin = () => {
             </div>
             <div className="bg-card rounded-xl border border-border p-6">
               <ShoppingCart className="h-8 w-8 text-primary mb-2" />
-              <p className="text-2xl font-bold">{orders.length}</p>
+              <p className="text-2xl font-bold">{ordersList.length}</p>
               <p className="text-sm text-muted-foreground">Recent Orders</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-6">
               <Package className="h-8 w-8 text-primary mb-2" />
-              <p className="text-2xl font-bold">{products.length}</p>
+              <p className="text-2xl font-bold">{productsList.length}</p>
               <p className="text-sm text-muted-foreground">Products</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-6">
@@ -174,7 +168,7 @@ const Admin = () => {
         )}
 
         {/* Recent Orders - Only show if user has view_all_orders permission */}
-        {hasPermission('view_all_orders') && orders.length > 0 && (
+        {hasPermission('view_all_orders') && ordersList.length > 0 && (
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-lg">Recent Orders</h2>
@@ -194,7 +188,7 @@ const Admin = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.slice(0, 5).map((order) => (
+                  {ordersList.slice(0, 5).map((order) => (
                     <tr key={order.id} className="border-b border-border">
                       <td className="py-3 px-2 font-mono">{order.order_number}</td>
                       <td className="py-3 px-2 capitalize">{order.status}</td>

@@ -7,9 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { orders, Order } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { Order } from '@/types/database';
 import { toast } from 'sonner';
 
 const statusConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
@@ -23,7 +22,7 @@ const statusConfig: Record<string, { icon: React.ReactNode; color: string; label
 const OrderManagement = () => {
   const { user, hasPermission, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersList, setOrdersList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -41,31 +40,33 @@ const OrderManagement = () => {
   }, []);
 
   const fetchOrders = async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (data) setOrders(data);
-    setLoading(false);
+    try {
+      const response = await orders.list();
+      setOrdersList(response.data.orders || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to fetch orders');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status: newStatus })
-      .eq('id', orderId);
-
-    if (error) {
+    try {
+      // Note: You'll need to create an update endpoint in your PHP backend
+      // For now, this will show an error
+      toast.error('Update order status endpoint not yet implemented');
+      
+      // TODO: Implement this endpoint in PHP
+      // await orders.updateStatus(orderId, newStatus);
+      // toast.success('Order status updated');
+      // fetchOrders();
+    } catch (error) {
       toast.error('Failed to update order status');
-      return;
     }
-
-    toast.success('Order status updated');
-    fetchOrders();
   };
 
-  const filteredOrders = orders.filter(o => {
+  const filteredOrders = ordersList.filter(o => {
     const matchesSearch = o.order_number.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -90,7 +91,7 @@ const OrderManagement = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="section-title">Orders</h1>
-            <p className="text-muted-foreground">{orders.length} total orders</p>
+            <p className="text-muted-foreground">{ordersList.length} total orders</p>
           </div>
         </div>
 
@@ -123,7 +124,6 @@ const OrderManagement = () => {
               <TableRow>
                 <TableHead>Order</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead>Date</TableHead>
@@ -155,10 +155,9 @@ const OrderManagement = () => {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>-</TableCell>
                     <TableCell>${Number(order.total).toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
+                      <Badge variant={order.payment_status === 'completed' ? 'default' : 'secondary'}>
                         {order.payment_status}
                       </Badge>
                     </TableCell>

@@ -9,15 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Layout } from '@/components/layout/Layout';
-import { supabase } from '@/integrations/supabase/client';
+import { products, Product } from '@/lib/apiClient';
 import { useAuth } from '@/hooks/useAuth';
-import { Product, Category } from '@/types/database';
 import { toast } from 'sonner';
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 const ProductManagement = () => {
   const { user, hasPermission, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [productsList, setProductsList] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -47,14 +52,26 @@ const ProductManagement = () => {
   }, []);
 
   const fetchData = async () => {
-    const [productsRes, categoriesRes] = await Promise.all([
-      supabase.from('products').select('*').order('created_at', { ascending: false }),
-      supabase.from('categories').select('*'),
-    ]);
-
-    if (productsRes.data) setProducts(productsRes.data);
-    if (categoriesRes.data) setCategories(categoriesRes.data);
-    setLoading(false);
+    try {
+      const productsResponse = await products.list();
+      setProductsList(productsResponse.data.products || []);
+      
+      // TODO: Fetch categories from API when endpoint is ready
+      // For now, hardcode common categories
+      setCategories([
+        { id: '1', name: 'Electronics', slug: 'electronics' },
+        { id: '2', name: 'Fashion', slug: 'fashion' },
+        { id: '3', name: 'Home & Garden', slug: 'home-garden' },
+        { id: '4', name: 'Sports', slug: 'sports' },
+        { id: '5', name: 'Books', slug: 'books' },
+        { id: '6', name: 'Beauty', slug: 'beauty' },
+      ]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to fetch products');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -89,61 +106,43 @@ const ProductManagement = () => {
   };
 
   const handleSubmit = async () => {
-    const slug = formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-');
-    
-    const productData = {
-      name: formData.name,
-      slug,
-      description: formData.description || null,
-      price: parseFloat(formData.price),
-      original_price: formData.original_price ? parseFloat(formData.original_price) : null,
-      image_url: formData.image_url || null,
-      category_id: formData.category_id || null,
-      stock_quantity: parseInt(formData.stock_quantity) || 0,
-      is_featured: formData.is_featured,
-    };
-
-    if (editingProduct) {
-      const { error } = await supabase
-        .from('products')
-        .update(productData)
-        .eq('id', editingProduct.id);
-
-      if (error) {
-        toast.error('Failed to update product');
-        return;
-      }
-      toast.success('Product updated');
-    } else {
-      const { error } = await supabase
-        .from('products')
-        .insert(productData);
-
-      if (error) {
-        toast.error('Failed to create product');
-        return;
-      }
-      toast.success('Product created');
+    try {
+      // TODO: Implement create/update product endpoints
+      toast.error('Product create/update endpoints not yet implemented');
+      
+      // This would be the actual implementation:
+      // if (editingProduct) {
+      //   await products.update(editingProduct.id, formData);
+      //   toast.success('Product updated');
+      // } else {
+      //   await products.create(formData);
+      //   toast.success('Product created');
+      // }
+      
+      setDialogOpen(false);
+      resetForm();
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to save product');
     }
-
-    setDialogOpen(false);
-    resetForm();
-    fetchData();
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (!confirm('Are you sure you want to delete this product?')) return;
     
-    if (error) {
+    try {
+      // TODO: Implement delete product endpoint
+      toast.error('Product delete endpoint not yet implemented');
+      
+      // await products.delete(id);
+      // toast.success('Product deleted');
+      // fetchData();
+    } catch (error) {
       toast.error('Failed to delete product');
-      return;
     }
-
-    toast.success('Product deleted');
-    fetchData();
   };
 
-  const filteredProducts = products.filter(p =>
+  const filteredProducts = productsList.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -166,7 +165,7 @@ const ProductManagement = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="section-title">Products</h1>
-            <p className="text-muted-foreground">{products.length} products</p>
+            <p className="text-muted-foreground">{productsList.length} products</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
@@ -292,9 +291,7 @@ const ProductManagement = () => {
                   </TableCell>
                   <TableCell>${Number(product.price).toFixed(2)}</TableCell>
                   <TableCell>{product.stock_quantity}</TableCell>
-                  <TableCell>
-                    {categories.find(c => c.id === product.category_id)?.name || '-'}
-                  </TableCell>
+                  <TableCell>{product.category_name || '-'}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
                       <Edit className="h-4 w-4" />
