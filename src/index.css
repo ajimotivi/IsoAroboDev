@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ìsọ̀ Àrọbọ̀ - Premium E-Commerce Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Rich warm palette - Earthy elegance */
+    --background: 30 25% 97%;
+    --foreground: 20 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 30% 12%;
+
+    /* Warm terracotta primary */
+    --primary: 18 75% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 18 75% 38%;
+
+    /* Soft cream secondary */
+    --secondary: 35 30% 92%;
+    --secondary-foreground: 20 30% 25%;
+
+    /* Muted warm tones */
+    --muted: 30 20% 94%;
+    --muted-foreground: 20 15% 45%;
+
+    /* Gold accent */
+    --accent: 42 85% 55%;
+    --accent-foreground: 20 30% 12%;
+
+    /* Status colors */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 30 20% 85%;
+    --input: 30 20% 85%;
+    --ring: 18 75% 45%;
+
+    --radius: 0.75rem;
+
+    /* Custom e-commerce tokens */
+    --sale: 0 72% 51%;
+    --rating: 45 100% 51%;
+    --badge-new: 18 75% 45%;
+    --badge-sale: 0 72% 51%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 20 30% 25%;
+    --sidebar-primary: 18 75% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 35 30% 92%;
+    --sidebar-accent-foreground: 20 30% 25%;
+    --sidebar-border: 30 20% 85%;
+    --sidebar-ring: 18 75% 45%;
+  }
+
+  .dark {
+    --background: 20 25% 8%;
+    --foreground: 30 20% 95%;
+
+    --card: 20 25% 12%;
+    --card-foreground: 30 20% 95%;
+
+    --popover: 20 25% 12%;
+    --popover-foreground: 30 20% 95%;
+
+    --primary: 18 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 18 70% 62%;
+
+    --secondary: 20 20% 18%;
+    --secondary-foreground: 30 20% 85%;
+
+    --muted: 20 20% 16%;
+    --muted-foreground: 30 15% 55%;
+
+    --accent: 42 80% 60%;
+    --accent-foreground: 20 30% 12%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 20 20% 20%;
+    --input: 20 20% 20%;
+    --ring: 18 70% 55%;
+
+    --sidebar-background: 20 25% 10%;
+    --sidebar-foreground: 30 20% 85%;
+    --sidebar-primary: 18 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 20 20% 16%;
+    --sidebar-accent-foreground: 30 20% 85%;
+    --sidebar-border: 20 20% 20%;
+    --sidebar-ring: 18 70% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .container-main {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary-hover transition-all duration-300 font-medium shadow-md hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  .btn-accent {
+    @apply bg-accent text-accent-foreground hover:bg-accent/90 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5;
+  }
+
+  .card-product {
+    @apply bg-card rounded-2xl border border-border shadow-md hover:shadow-xl transition-all duration-500 overflow-hidden hover:-translate-y-1;
+  }
+
+  .badge-sale {
+    @apply bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1.5 rounded-full;
+  }
+
+  .badge-new {
+    @apply bg-primary text-primary-foreground text-xs font-bold px-3 py-1.5 rounded-full;
+  }
+
+  .price-original {
+    @apply text-muted-foreground line-through text-sm;
+  }
+
+  .price-sale {
+    @apply text-destructive font-bold;
+  }
+
+  .price-current {
+    @apply text-foreground font-bold text-lg;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 border border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all duration-300;
+  }
+
+  .link-nav {
+    @apply text-muted-foreground hover:text-primary transition-colors duration-300 font-medium relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all after:duration-300 hover:after:w-full;
+  }
+
+  .section-title {
+    @apply text-3xl md:text-4xl font-bold text-foreground;
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .glass-effect {
+    @apply bg-card/80 backdrop-blur-lg border border-border/50;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0; 
+      transform: translateY(30px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0; 
+      transform: scale(0.9); 
+    }
+    to { 
+      opacity: 1; 
+      transform: scale(1); 
+    }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+}
