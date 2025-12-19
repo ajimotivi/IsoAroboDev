@@ -30,6 +30,10 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   return data;
 }
 
+// ============================================
+// AUTHENTICATION
+// ============================================
+
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -73,6 +77,10 @@ export const auth = {
     return !!getAuthToken();
   },
 };
+
+// ============================================
+// PRODUCTS
+// ============================================
 
 export interface Product {
   id: string;
@@ -126,7 +134,18 @@ export const products = {
 
     return apiRequest<ProductsResponse>(endpoint, { method: 'GET' });
   },
+
+  getBySlug: async (slug: string): Promise<{ success: boolean; data: { product: Product } }> => {
+    return apiRequest<{ success: boolean; data: { product: Product } }>(
+      `/products/details.php?slug=${slug}`,
+      { method: 'GET' }
+    );
+  },
 };
+
+// ============================================
+// CART
+// ============================================
 
 export interface CartItem {
   id: string;
@@ -167,4 +186,69 @@ export const cart = {
   },
 };
 
-export default { auth, products, cart };
+// ============================================
+// ORDERS
+// ============================================
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  product_name: string;
+  product_price: number;
+  quantity: number;
+  subtotal: number;
+}
+
+export interface Order {
+  id: string;
+  user_id: string;
+  order_number: string;
+  status: string;
+  subtotal: number;
+  tax: number;
+  shipping: number;
+  total: number;
+  shipping_address: string | null;
+  shipping_city: string | null;
+  shipping_postal_code: string | null;
+  shipping_country: string | null;
+  payment_method: string | null;
+  payment_status: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: OrderItem[];
+}
+
+export const orders = {
+  create: async (orderData: {
+    shipping_address: string;
+    shipping_city: string;
+    shipping_postal_code: string;
+    shipping_country: string;
+    payment_method: string;
+    notes?: string;
+  }): Promise<{ success: boolean; data: { order: Order } }> => {
+    return apiRequest<{ success: boolean; data: { order: Order } }>('/orders/create.php', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+  },
+
+  list: async (): Promise<{ success: boolean; data: { orders: Order[] } }> => {
+    return apiRequest<{ success: boolean; data: { orders: Order[] } }>(
+      '/orders/list.php',
+      { method: 'GET' }
+    );
+  },
+
+  getById: async (orderId: string): Promise<{ success: boolean; data: { order: Order } }> => {
+    return apiRequest<{ success: boolean; data: { order: Order } }>(
+      `/orders/details.php?id=${orderId}`,
+      { method: 'GET' }
+    );
+  },
+};
+
+export default { auth, products, cart, orders };
